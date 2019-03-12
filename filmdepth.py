@@ -11,7 +11,7 @@ film = []
 BLACK = 0
 WHITE = 255
 
-
+# If i make changes where does it go to 
 # function to scan the left side of the frame for the fiber and measure the number of pixels width
 def FiberWidthTest(frame, scalebar):
 
