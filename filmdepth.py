@@ -82,8 +82,8 @@ def ScanningRegion(frame):
     return row
 
 
-
-camera = cv2.VideoCapture('test2_trimmed.mov')                     # start a connection to the file
+# must put the path to where you have the videos save here
+camera = cv2.VideoCapture("/Users/matthewsimmons/Desktop/College/Research/ImageProcessing/test_trimmed.mov")                     # start a connection to the file
 endofvideo = int(camera.get(cv2.CAP_PROP_FRAME_COUNT))  # the frame count is found using this function
 print('NUMBER OF FRAMES: ', endofvideo)
 count = 0           # frames in a video
