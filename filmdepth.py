@@ -82,22 +82,22 @@ def ScanningRegion(frame):
     return row
 
 
-# must put the path to where you have the videos save here
+# must put the path to where you have the videos saved here
 camera = cv2.VideoCapture("/Users/matthewsimmons/Desktop/College/Research/ImageProcessing/test_trimmed.mov")                     # start a connection to the file
 endofvideo = int(camera.get(cv2.CAP_PROP_FRAME_COUNT))  # the frame count is found using this function
 print('NUMBER OF FRAMES: ', endofvideo)
-count = 0           # frames in a video
-scalebar = 0        # ratio of microns/pixels
-scan_range = []     # the rows that meet tolerance level near wide part of device
-thresholdvalue = 170# optimum value for binary thresholding
+count = 0            # frames in a video
+scalebar = 0         # ratio of microns/pixels
+scan_range = []      # the rows that meet tolerance level near wide part of device
+thresholdvalue = 170 # optimum value for binary thresholding
 jumpback = 120
 viewimage = 1
 
-
-camera.set(cv2.CAP_PROP_POS_FRAMES, endofvideo-2)
-ret, frame = camera.read()                                    # draw the result
+# this block of code is for finding the width of the fiber
+camera.set(cv2.CAP_PROP_POS_FRAMES, endofvideo-2)                # go to one of the last frames in the video when the fiber is in the frame
+ret, frame = camera.read()                                       # get the fram
 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                   # turn it gray
-ret, thresh = cv2.threshold(gray, thresholdvalue, 255, cv2.THRESH_BINARY)
+ret, thresh = cv2.threshold(gray, thresholdvalue, 255, cv2.THRESH_BINARY) # threshold it
 if viewimage == 1:
     cv2.imshow('Fiber', thresh)
 scalebar = FiberWidthTest(thresh, scalebar)
@@ -105,6 +105,7 @@ print('SCALEBAR: ', scalebar)
 thresholdvalue = 158
 cv2.waitKey(0)
 
+# this block of code is for finding the widest points on the device according to our tolerance
 camera.set(cv2.CAP_PROP_POS_FRAMES, endofvideo-jumpback)
 ret, frame = camera.read()
 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                   # turn it gray
@@ -120,7 +121,7 @@ if viewimage == 1:
 thresholdvalue = 158                                                           # optimal thresh value for the wet device
 cv2.waitKey(0)
 
-camera.set(cv2.CAP_PROP_POS_FRAMES, 0)
+camera.set(cv2.CAP_PROP_POS_FRAMES, 0) # set the video back to the initial frame for comparison
 
 
 while True:
@@ -138,16 +139,11 @@ while True:
     measure_sum = 0         # sum of the said list
     measure_avg = 0         # avg value of depth in pixels
 
-    #FOR TESTING if len(scan_range) == len(column_scan):
-    #    print("TRUE")
-    #else:
-    #   print('FALSE')
     for i in range(len(scan_range)):                            # scan each of the rows that were within 3 pixels of the widest point
         for j in range(column - scan_tolerance, column+10):        # scan 50 pixels in front of the dry device
             px = thresh[scan_range[i], j]                       # scanning location
             pxplusone = thresh[scan_range[i], j + 1]            # look one pixel ahead of scanning location
             if px == WHITE and pxplusone == BLACK:                    # if the scanning location is black and the next pixel is white
-                #print('column: ', column, 'pxplusone: ', j+1)
                 measurements.append(column_scan[i] - (j + 1))   # save the difference between the ERROR HERE
                 break
 
@@ -180,43 +176,35 @@ counter = 0                                                 # int for counting t
 summation = 0                                               # int that takes the temporary sums
 for x in range(int(len(film)/average_over)*average_over):        # if there are 15789 frames analyzed, and the average is 10, this rounds it down. e.g. 15780
     counter = counter + 1                                           # a counter
-    summation = film[x] + summation                              # a summation
+    summation = film[x] + summation                                 # a summation
     if counter == average_over:                                     # when the counter reaches the averaging amount
         counter = 0                                                 # reset the counter
-        averaged_microns.append(summation/average_over)  # store the but as microns instead of pixels
+        averaged_microns.append(summation/average_over)             # store the averaged value
         summation = 0                                               # reset the sum for the next batch of x measurements
 
 
 
 fps = 10                                # 10 frames per second based on the THOR documentation
 seconds = 60
-# length_time = len(averaged_microns)*1.11/60
+
 time = np.arange(len(averaged_microns))
-length_time = (len(averaged_microns)*average_over)/(seconds*fps)
-integer = int(length_time)
-print('Time Minutes: ', integer)
 
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
 ax1.plot(time, averaged_microns, '.')
 
 scale_time = (len(averaged_microns)*average_over)/(seconds*fps)
+#Just some print statements to make sure we're converting the frames to minutes correctly
 print('# Frames analyzed: ', len(film))
 print('Length of average_microns:', len(averaged_microns))
 print('Length of time:', len(time))
-print('scale_time:', scale_time)
-integer = int(scale_time)
-ticks_x = ticker.FuncFormatter(lambda time, pos: '{0:g}'.format(time*average_over/600))
+print('Time in Minutes:', scale_time)
+
+ticks_x = ticker.FuncFormatter(lambda time, pos: '{0:g}'.format(time*average_over/600)) #adjust the x-axis to be the correct time in minutes
 ax1.xaxis.set_major_formatter(ticks_x)
 ax1.set_xlabel("Time in Minutes")
 ax1.set_ylabel("Film Thickness (um)")
 ax1.set_title("Stability of Film Thickness Over Time")
 plt.show()
-
-# plt.plot(time, averaged_microns,'.')               # plots the data on the y-axis over frames, using pixels or ','
-# plt.ylabel('Film Depth in Microns')                #
-# plt.xlabel('Time in Minutes')
-# plt.xticks(np.arange(integer+1))
-
 
 cv2.waitKey(0)
