@@ -11,7 +11,7 @@ film = []
 BLACK = 0
 WHITE = 255
 
-# If i make changes where does it go to 
+# If i make changes where does it go to
 # function to scan the left side of the frame for the fiber and measure the number of pixels width
 def FiberWidthTest(frame, scalebar):
 
@@ -121,8 +121,49 @@ if viewimage == 1:
 thresholdvalue = 158                                                           # optimal thresh value for the wet device
 cv2.waitKey(0)
 
+
+neck_evaporation = 630
+neck_column = 0
+neck_scan_begin = 560
+neck_scan_end = 800
+
+
+while True:
+    var = input("Enter an intger or 'q' to continue: ")
+    try:                                # the try-except throws an error if the expected integer is anything else but an integer
+        var_int = int(var)
+    except ValueError:
+        var_int = 0
+    if var == "q":                      # this is looking for a lowercase q to break out of the cycle of inputs
+        break
+    elif var_int >= 0 and var_int <= 1024:  # as long as the inputed number is within the range designated by the screen resolution
+        cv2.line(thresh, (neck_scan_begin,var_int), (neck_scan_end,var_int), (178, 34, 34), 1) # then we draw a line arbitrary in length at the designated row
+    else:
+        print("That is out of range or not an integer")     # if something outside the range or not an integer is inputed, this error message is displayed
+        continue
+    cv2.imshow('Neck', thresh)       # as we draw lines we will print the updated image to see the result
+    cv2.waitKey(10)                        # waits 10 ms before going to the next input. This is mandatory so the image is displayed properly
+
+ret, frame = camera.read()
+gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                   # turn it gray
+ret, thresh = cv2.threshold(gray, thresholdvalue, 255, cv2.THRESH_BINARY)
+
+for i in range(neck_scan_begin, neck_scan_end):        # scan 50 pixels in front of the dry device
+    px = thresh[neck_evaporation, i]                       # scanning location
+    pxplusone = thresh[neck_evaporation, i + 1]            # look one pixel ahead of scanning location
+    if px == WHITE and pxplusone == BLACK:                    # if the scanning location is black and the next pixel is white
+        neck_column = i + 1   # save the difference between the ERROR HERE
+        break
+cv2.line(thresh, (neck_scan_begin,neck_evaporation), (neck_scan_end,neck_evaporation), (178, 34, 34), 1)
+cv2.imshow('Line', thresh)
+print('neck_column: ', neck_column)
+
+
 camera.set(cv2.CAP_PROP_POS_FRAMES, 0) # set the video back to the initial frame for comparison
 
+
+raw_data = [[] for i in range(len(scan_range))]
+neck_evap_meas = []
 
 while True:
     count = count + 1                                                # frame counter
@@ -145,7 +186,14 @@ while True:
             pxplusone = thresh[scan_range[i], j + 1]            # look one pixel ahead of scanning location
             if px == WHITE and pxplusone == BLACK:                    # if the scanning location is black and the next pixel is white
                 measurements.append(column_scan[i] - (j + 1))   # save the difference between the ERROR HERE
+                raw_data[i].append((column_scan[i] - (j + 1))*scalebar)
                 break
+    for j in range(neck_scan_begin, neck_scan_end):        # scan 50 pixels in front of the dry device
+        px = thresh[neck_evaporation, j]                       # scanning location
+        pxplusone = thresh[neck_evaporation, j + 1]            # look one pixel ahead of scanning location
+        if px == WHITE and pxplusone == BLACK:                    # if the scanning location is black and the next pixel is white
+            neck_evap_meas.append((neck_column - (j + 1))*scalebar)   # save the difference between the ERROR HERE
+            break
 
     for x in range(len(measurements)):                          # for all of the measurements
         measure_sum = measure_sum + measurements[x]             # sum each in the list
@@ -153,7 +201,7 @@ while True:
         measure_avg = measure_sum / len(measurements)           # take the average by dividing the sum by the number of measurements
         microns = measure_avg * scalebar                        # convert the pixel depth of film to microns using the scalebar found previously
         film.append(microns)                                    # add each frame's measurement to a list called film
-        print('film width in pixels: ', measure_avg, 'film width in microns: ', microns)
+        #print('film width in pixels: ', measure_avg, 'film width in microns: ', microns)
                                                                     #FOR TESTING print('MEASUREMENTS: ', measurements
     # if count == endofvideo-600:
     #     thresholdvalue = 135
@@ -187,24 +235,51 @@ for x in range(int(len(film)/average_over)*average_over):        # if there are 
 fps = 10                                # 10 frames per second based on the THOR documentation
 seconds = 60
 
-time = np.arange(len(averaged_microns))
-
-fig = plt.figure()
-ax1 = fig.add_subplot(111)
-ax1.plot(time, averaged_microns, '.')
-
+time1 = np.arange(len(averaged_microns))
+time2 = np.arange(len(raw_data[0]))
 scale_time = (len(averaged_microns)*average_over)/(seconds*fps)
+
+fig = plt.figure(1)
+ax1 = fig.add_subplot(211)
+ax2 = fig.add_subplot(212)
+ax1.plot(time1, averaged_microns, '.')
+for i in range(len(scan_range)):
+    ax2.plot(time2, raw_data[i], '.')
+
+
 #Just some print statements to make sure we're converting the frames to minutes correctly
 print('# Frames analyzed: ', len(film))
 print('Length of average_microns:', len(averaged_microns))
-print('Length of time:', len(time))
+print('Length of time:', len(time1))
 print('Time in Minutes:', scale_time)
+print('Length of Time2 ', len(time2))
 
-ticks_x = ticker.FuncFormatter(lambda time, pos: '{0:g}'.format(time*average_over/600)) #adjust the x-axis to be the correct time in minutes
-ax1.xaxis.set_major_formatter(ticks_x)
+ticks_x1 = ticker.FuncFormatter(lambda time1, pos: '{0:g}'.format(time1*average_over/600)) #adjust the x-axis to be the correct time in minutes
+ax1.xaxis.set_major_formatter(ticks_x1)
 ax1.set_xlabel("Time in Minutes")
 ax1.set_ylabel("Film Thickness (um)")
-ax1.set_title("Stability of Film Thickness Over Time")
+ax1.set_title("Averaged Stability of Film Thickness Over Time")
+
+ticks_x2 = ticker.FuncFormatter(lambda time2, pos: '{0:g}'.format(time2/600)) #adjust the x-axis to be the correct time in minutes
+ax2.xaxis.set_major_formatter(ticks_x2)
+ax2.set_xlabel("Time in Minutes")
+ax2.set_ylabel("Film Thickness (um)")
+ax2.set_title("Raw Data Stability of Film Thickness Over Time")
+
+plt.subplots_adjust(hspace=.7)
+
+time3 = np.arange(len(neck_evap_meas))
+
+fig2 = plt.figure(2)
+ax3 = fig2.add_subplot(111)
+ax3.plot(time3, neck_evap_meas, '.')
+
+ticks_x3 = ticker.FuncFormatter(lambda time3, pos: '{0:g}'.format(time3/600)) #adjust the x-axis to be the correct time in minutes
+ax3.xaxis.set_major_formatter(ticks_x3)
+ax3.set_xlabel("Time in Minutes")
+ax3.set_ylabel("Film Thickness at Neck (um)")
+ax3.set_title("Film Thickness at the Neck of the Device")
+
 plt.show()
 
 cv2.waitKey(0)
