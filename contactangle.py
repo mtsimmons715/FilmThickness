@@ -1,8 +1,16 @@
 import numpy as np
 import cv2
-#import matplotlib.pyplot as plt
 import pylab as plt
 import matplotlib.ticker as ticker
+
+'''
+This script is for the contact angle videos that we take
+This analyzes the first frame to get the fiber and the dry device points instead of one of the last frames
+like in the other script
+
+'''
+
+
 
 #global variables
 column = 1280     # this is the farthest right pixel in our window
@@ -53,7 +61,7 @@ def ScanningRegion(frame):
 
     # we scan from left to right across each row, then move downwards looking for the column that has the first white pixel
     for i in range(1,600):                     # 1024 rows of pixels
-        for j in range(400,1000):                 # 1280 columns of pixels
+        for j in range(500,1000):                 # 1280 columns of pixels
             px = frame[i,j]                     # pixels are [row, column] so basically [y, x], yes it's inverted
             if j != 999:                       # if we are not on the last column
                 pxplusone = frame[i,j+1]        # look ahead at the upcoming pixel in the scan
@@ -89,12 +97,11 @@ print('NUMBER OF FRAMES: ', endofvideo)
 count = 0            # frames in a video
 scalebar = 0         # ratio of microns/pixels
 scan_range = []      # the rows that meet tolerance level near wide part of device
-thresholdvalue = 170 # optimum value for binary thresholding
+thresholdvalue = 200 # optimum value for binary thresholding
 jumpback = 120
 viewimage = 1
 
 # this block of code is for finding the width of the fiber
-camera.set(cv2.CAP_PROP_POS_FRAMES, endofvideo-2)                # go to one of the last frames in the video when the fiber is in the frame
 ret, frame = camera.read()                                       # get the fram
 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                   # turn it gray
 ret, thresh = cv2.threshold(gray, thresholdvalue, 255, cv2.THRESH_BINARY) # threshold it
@@ -102,11 +109,10 @@ if viewimage == 1:
     cv2.imshow('Fiber', thresh)
 scalebar = FiberWidthTest(thresh, scalebar)
 print('SCALEBAR: ', scalebar)
-thresholdvalue = 158
+thresholdvalue = 185
 cv2.waitKey(0)
 
 # this block of code is for finding the widest points on the device according to our tolerance
-camera.set(cv2.CAP_PROP_POS_FRAMES, endofvideo-jumpback)
 ret, frame = camera.read()
 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                   # turn it gray
 ret, thresh = cv2.threshold(gray, thresholdvalue, 255, cv2.THRESH_BINARY)
@@ -118,56 +124,14 @@ if viewimage == 1:
         cv2.line(frame, (column_scan[x],scan_range[x]), (column_scan[x],scan_range[x]), (178, 34, 34), 1)
         cv2.imshow('Dry Device Edited', frame)                                          # print a color frame to show the pixels being measured
     print('COLUMNS: ', column_scan, 'SCANNING RANGE ROWS: ', scan_range)            # FOR TESTING prints our found scanning range
-thresholdvalue = 158                                                           # optimal thresh value for the wet device
+thresholdvalue = 185                                                         # optimal thresh value for the wet device
 cv2.waitKey(0)
 
 
 
-neck_scan_begin = 560
-neck_scan_end = 800
-
-while True:
-    var = input("Enter an intger or 'q' to continue: ")
-    try:                                # the try-except throws an error if the expected integer is anything else but an integer
-        var_int = int(var)
-    except ValueError:
-        var_int = 0
-    if var == "q":                      # this is looking for a lowercase q to break out of the cycle of inputs
-        break
-    elif var_int >= 0 and var_int <= 1024:  # as long as the inputed number is within the range designated by the screen resolution
-        cv2.line(thresh, (neck_scan_begin,var_int), (neck_scan_end,var_int), (178, 34, 34), 1) # then we draw a line arbitrary in length at the designated row
-    else:
-        print("That is out of range or not an integer")     # if something outside the range or not an integer is inputed, this error message is displayed
-        continue
-    cv2.imshow('Neck', thresh)       # as we draw lines we will print the updated image to see the result
-    cv2.waitKey(10)                        # waits 10 ms before going to the next input. This is mandatory so the image is displayed properly
-
-input1 = input("Enter the row you would like to analyze: ")
-neck_evaporation = int(input1)
-neck_column = 0
-
-ret, frame = camera.read()
-gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)                   # turn it gray
-ret, thresh = cv2.threshold(gray, thresholdvalue, 255, cv2.THRESH_BINARY)
-
-for i in range(neck_scan_begin, neck_scan_end):        # scan the range of the white line drawn in the picture above
-    px = thresh[neck_evaporation, i]                       # scanning location
-    pxplusone = thresh[neck_evaporation, i + 1]            # look one pixel ahead of scanning location
-    if px == WHITE and pxplusone == BLACK:                 # if the scanning location is white and the next pixel is black
-        neck_column = i + 1                                # the widest point is that black pixel
-        break
-
-if viewimage == 1:
-    cv2.line(thresh, (neck_scan_begin,neck_evaporation), (neck_scan_end,neck_evaporation), (178, 34, 34), 1)
-    cv2.imshow('Line', thresh)
-    print('neck_column: ', neck_column)
-
-
-camera.set(cv2.CAP_PROP_POS_FRAMES, 0) # set the video back to the initial frame for comparison
 
 
 raw_data = [[] for i in range(len(scan_range))]
-neck_evap_meas = []
 
 while True:
     count = count + 1                                                # frame counter
@@ -192,12 +156,6 @@ while True:
                 measurements.append(column_scan[i] - (j + 1))   # save the difference of the dry column and wet column (thickness of fiml in pixels)
                 raw_data[i].append((column_scan[i] - (j + 1))*scalebar)
                 break
-    for j in range(neck_scan_begin, neck_scan_end):            # scan the neck of the device
-        px = thresh[neck_evaporation, j]                       # scanning location
-        pxplusone = thresh[neck_evaporation, j + 1]            # look one pixel ahead of scanning location
-        if px == WHITE and pxplusone == BLACK:                    # if the scanning location is white and the next pixel is black
-            neck_evap_meas.append((neck_column - (j + 1))*scalebar)   # save the difference of the dry column and wet column (thickness of fiml in pixels)
-            break
 
     for x in range(len(measurements)):                          # for all of the measurements
         measure_sum = measure_sum + measurements[x]             # sum each in the list
@@ -205,12 +163,12 @@ while True:
         measure_avg = measure_sum / len(measurements)           # take the average by dividing the sum by the number of measurements
         microns = measure_avg * scalebar                        # convert the pixel depth of film to microns using the scalebar found previously
         film.append(microns)                                    # add each frame's measurement to a list called film
-        #print('film width in pixels: ', measure_avg, 'film width in microns: ', microns)
+        print('film width in pixels: ', measure_avg, 'film width in microns: ', microns)
 
     # if count == endofvideo-600:
     #     thresholdvalue = 135
 
-    if count == endofvideo-jumpback:                            # once we reach the end of the portion of video we want to analyze
+    if count == endofvideo-20:                            # once we reach the end of the portion of video we want to analyze
         cv2.destroyAllWindows()
         print('END OF THE VIDEO')
         break
@@ -248,11 +206,10 @@ time2 = np.arange(len(raw_data[0]))         # should be the # of frames analyzed
 scale_time = (len(averaged_microns)*average_over)/(seconds*fps) # time in minutes of averaged values
 
 fig = plt.figure(1)
-ax1 = fig.add_subplot(221)
 
 
 #3 separate plots option
-
+ax1 = fig.add_subplot(221)
 ax2 = fig.add_subplot(222)
 ax3 = fig.add_subplot(223)
 ax4 = fig.add_subplot(224)
@@ -293,6 +250,7 @@ ax4.set_title("Raw Data Film Thickness Over Time (2/3 Down)")
 '''
 #Same graph option
 
+ax1 = fig.add_subplot(211)
 ax1.plot(time1, averaged_microns, '.')
 ax2 = fig.add_subplot(212)
 for i in range(len(point)):
@@ -314,21 +272,6 @@ ax2.legend(('Top Point', '1/3 Down', '2/3 Down'), loc = 'upper right')
 '''
 
 plt.subplots_adjust(hspace=.7)          # widen the gap between the two plots
-
-'''
-time5 = np.arange(len(neck_evap_meas))
-
-fig2 = plt.figure(2)
-ax5 = fig2.add_subplot(111)
-ax5.plot(time5, neck_evap_meas, '.')
-
-ticks_x5 = ticker.FuncFormatter(lambda time5, pos: '{0:g}'.format(time5/600)) #adjust the x-axis to be the correct time in minutes
-ax5.xaxis.set_major_formatter(ticks_x5)
-ax5.set_xlabel("Time in Minutes")
-ax5.set_ylabel("Film Thickness at Neck (um)")
-ax5.set_title("Film Thickness at the Neck of the Device")
-'''
-
 
 plt.show()
 
