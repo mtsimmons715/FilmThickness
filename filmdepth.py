@@ -248,11 +248,10 @@ time2 = np.arange(len(raw_data[0]))         # should be the # of frames analyzed
 scale_time = (len(averaged_microns)*average_over)/(seconds*fps) # time in minutes of averaged values
 
 fig = plt.figure(1)
-ax1 = fig.add_subplot(221)
 
 
 #3 separate plots option
-
+ax1 = fig.add_subplot(221)
 ax2 = fig.add_subplot(222)
 ax3 = fig.add_subplot(223)
 ax4 = fig.add_subplot(224)
@@ -293,6 +292,7 @@ ax4.set_title("Raw Data Film Thickness Over Time (2/3 Down)")
 '''
 #Same graph option
 
+ax1 = fig.add_subplot(211)
 ax1.plot(time1, averaged_microns, '.')
 ax2 = fig.add_subplot(212)
 for i in range(len(point)):
